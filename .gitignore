@@ -1,0 +1,16 @@
+# Backup geojson penuh (9,3 MB) — app tidak memakainya, hanya versi ringan
+data/Kabupaten_JawaTimur.full.geojson
+
+# Shapefile mentah KEK & Kawasan Industri — app pakai hasil konversi .geojson
+data/*.shp
+data/*.dbf
+data/*.shx
+data/*.cpg
+data/*.prj
+data/*.qmd
+
+# Sampah OS/editor
+.DS_Store
+Thumbs.db
+*.pyc
+__pycache__/

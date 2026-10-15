@@ -24,11 +24,11 @@
   --sans:  'Inter', system-ui, -apple-system, sans-serif;
 
   --fs-display: 52px;  /* judul splash */
-  --fs-1: 34px;        /* judul panel */
-  --fs-2: 30px;        /* angka utama */
-  --fs-3: 18px;        /* angka/nama sekunder */
-  --fs-4: 14px;        /* teks & tombol */
-  --fs-5: 11.5px;      /* label & keterangan */
+  --fs-1: 25px;        /* judul panel */
+  --fs-2: 21px;        /* angka utama */
+  --fs-3: 15px;        /* angka/nama sekunder */
+  --fs-4: 12.5px;      /* teks & tombol */
+  --fs-5: 10.5px;      /* label & keterangan */
 
   --shadow:    0 14px 40px rgba(44, 46, 36, 0.10), 0 2px 6px rgba(44, 46, 36, 0.05);
   --shadow-sm: 0 4px 16px rgba(44, 46, 36, 0.07);
@@ -60,13 +60,13 @@ body {
 
 /* ---------- PANEL ---------- */
 #panel {
-  position: absolute; top: 22px; left: 22px; bottom: 22px;
-  width: 372px; z-index: 1000;
-  display: flex; flex-direction: column; gap: 26px;
-  padding: 30px 28px;
+  position: absolute; top: 16px; left: 16px; bottom: 16px;
+  width: 338px; z-index: 1000;
+  display: flex; flex-direction: column; gap: 15px;
+  padding: 18px 18px;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
   overflow-y: auto;
   transition: transform .4s cubic-bezier(.22, 1, .36, 1);
@@ -91,18 +91,18 @@ body {
 .lede { margin-top: 12px; font-size: var(--fs-4); font-weight: 500; line-height: 1.55; color: var(--txt-dim); }
 
 /* ---------- STATS ---------- */
-.stats { display: flex; flex-direction: column; gap: 12px; }
+.stats { display: flex; flex-direction: column; gap: 9px; }
 .stat {
   background: var(--card); border: 1px solid var(--line);
-  border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow-sm);
+  border-radius: 11px; padding: 11px 13px; box-shadow: var(--shadow-sm);
 }
 .stat-main { background: var(--accent-sf); border-color: transparent; }
 .stat-row { display: flex; gap: 12px; }
 .stat-row .stat { flex: 1; }
 .stat-label {
   display: block; font-size: var(--fs-5); font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--txt-mute); margin-bottom: 9px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--txt-mute); margin-bottom: 6px;
 }
 .stat-value {
   display: block; font-family: var(--serif);
@@ -116,16 +116,16 @@ body {
 /* ---------- SEKTOR ---------- */
 .section-title {
   font-size: var(--fs-5); font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--txt-dim); margin-bottom: 14px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--txt-dim); margin-bottom: 9px;
 }
 .muted { color: var(--txt-mute); }
 
-.sektor-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.sektor-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .sektor-item {
-  display: flex; align-items: center; gap: 13px; padding: 13px 15px;
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px;
   background: var(--card); border: 1px solid var(--line);
-  border-left: 3px solid transparent; border-radius: 12px; cursor: pointer;
+  border-left: 3px solid transparent; border-radius: 10px; cursor: pointer;
   transition: border-color .2s, background .2s, box-shadow .2s;
 }
 .sektor-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
@@ -138,7 +138,7 @@ body {
 .sektor-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
 .sektor-meta { flex: 1; min-width: 0; }
 .sektor-nama { display: block; font-size: var(--fs-3); font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
-.sektor-sub { display: block; font-size: var(--fs-5); font-weight: 500; color: var(--txt-mute); margin-top: 3px; }
+.sektor-sub { display: block; font-size: var(--fs-5); font-weight: 500; color: var(--txt-mute); margin-top: 2px; }
 .sektor-total { font-family: var(--serif); font-size: var(--fs-4); font-weight: 600; color: var(--txt-dim); text-align: right; white-space: nowrap; font-feature-settings: "tnum"; }
 
 /* ---------- LEGEND ---------- */
@@ -329,7 +329,7 @@ body {
 .mode-formula { margin-top: 10px; font-size: var(--fs-5); font-weight: 500; color: var(--txt-mute); line-height: 1.5; }
 
 /* ---------- TABEL PERINGKAT ---------- */
-.rank-table-wrap { max-height: 260px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.rank-table-wrap { max-height: 210px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
 .rank-table-wrap::-webkit-scrollbar { width: 6px; }
 .rank-table-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
 .rank-table { width: 100%; border-collapse: collapse; font-size: var(--fs-5); }
@@ -363,3 +363,21 @@ body {
 .popup-tab td:first-child { color: var(--txt-dim); text-align: left; }
 .popup-tab td:nth-child(2) { text-align: right; font-weight: 600; color: var(--ink); }
 .popup-tab td:nth-child(3) { text-align: right; color: var(--accent-dk); font-weight: 700; }
+
+/* ---------- TOC: LAPISAN (titik perusahaan + kawasan) ---------- */
+.toc-list { display: flex; flex-direction: column; gap: 5px; }
+.toc-item {
+  display: flex; align-items: center; gap: 9px; padding: 7px 11px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 9px; cursor: pointer; user-select: none;
+  transition: background .15s, box-shadow .15s;
+}
+.toc-item:hover { background: var(--surface); box-shadow: var(--shadow-sm); }
+.toc-item input { width: 15px; height: 15px; accent-color: var(--accent-dk); cursor: pointer; flex-shrink: 0; margin: 0; }
+.toc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,.7); }
+.toc-swatch { width: 15px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.toc-nama { flex: 1; min-width: 0; font-size: var(--fs-4); font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toc-count { font-family: var(--serif); font-size: var(--fs-5); font-weight: 600; color: var(--txt-mute); font-feature-settings: "tnum"; white-space: nowrap; }
+
+/* titik perusahaan: nama di popup pakai gaya popup-rank; status tutup */
+.popup-warn { margin-top: 8px; font-size: var(--fs-5); font-weight: 700; color: #b56a5a; }

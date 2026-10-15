@@ -40,10 +40,17 @@
     { key: "grid", nama: "Sel Grid 11 km" }
   ];
   var GEOJSON_URL = "data/Kabupaten_JawaTimur.geojson";
+  var POI_URL = "data/perusahaan.json";
+  var KAWASAN = [
+    { key: "kek", nama: "KEK (Kawasan Ekonomi Khusus)", file: "data/KEK_Jatim.geojson", color: "#a83232", count: 0 },
+    { key: "ki",  nama: "Kawasan Industri",             file: "data/Kawasan_Industri_Jatim.geojson", color: "#2f6f8f", count: 0 }
+  ];
 
-  // ---- ramp warna ----
-  var RAMP = ["#efe8d6", "#cdd2a6", "#a9b47e", "#8b9a6e", "#6a7850", "#3c4626"];
-  var RAMP_PRIO = ["#f4ecd8", "#f0c86b", "#e8944b", "#d65f3f", "#a83232", "#6e1f22"]; // prioritas: kuning→merah tua
+  // ---- ramp warna (rendah→tinggi) ----
+  var RAMP_PRIO  = ["#f4ecd8", "#f0c86b", "#e8944b", "#d65f3f", "#a83232", "#6e1f22"]; // prioritas: kuning→merah tua
+  var RAMP_EMISI = ["#0d0d0d", "#470c0c", "#991c1c", "#e0481f", "#f59a2b", "#ffe24a"]; // emisi: hitam→merah→kuning terang
+  var RAMP_TK    = ["#082c54", "#134d86", "#2f74b5", "#62a3d6", "#9cc7e8", "#d4e7f7"]; // TK: biru gelap→biru terang
+  var RAMP_EKO   = ["#00341a", "#0e5a2e", "#2d8f4d", "#5cb974", "#9bd9a4", "#d4f1d0"]; // ekonomi: hijau gelap→hijau terang
   function hex(c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
   function rampOf(arr) {
     var rgb = arr.map(hex);
@@ -57,13 +64,30 @@
                       Math.round(a[2] + (b[2] - a[2]) * ff) + ")";
     };
   }
-  var rampEmisi = rampOf(RAMP), rampPrio = rampOf(RAMP_PRIO);
+  var rampPrio = rampOf(RAMP_PRIO), rampEmisi = rampOf(RAMP_EMISI), rampTK = rampOf(RAMP_TK), rampEko = rampOf(RAMP_EKO);
+  function rampForMode(mode) {
+    return mode.key === "emisi" ? rampEmisi : mode.key === "tk" ? rampTK : mode.key === "ekonomi" ? rampEko : rampPrio;
+  }
 
   var fmt = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
   var fmt1 = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
   var fmt3 = new Intl.NumberFormat("id-ID", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
   function fnum(n) { return fmt.format(n); }
   function fval(n) { if (n >= 1e9) return fmt1.format(n / 1e9) + " M"; if (n >= 1e6) return fmt1.format(n / 1e6) + " jt"; if (n >= 1e3) return fmt1.format(n / 1e3) + " rb"; return fmt.format(n); }
+  // nilai ekonomi tersimpan dalam RIBU Rupiah → tampilkan Rupiah penuh, tak ambigu
+  function frp(k) {
+    var r = k * 1000;
+    if (r >= 1e12) return "Rp " + fmt1.format(r / 1e12) + " triliun";
+    if (r >= 1e9)  return "Rp " + fmt1.format(r / 1e9) + " miliar";
+    if (r >= 1e6)  return "Rp " + fmt1.format(r / 1e6) + " juta";
+    if (r >= 1e3)  return "Rp " + fmt1.format(r / 1e3) + " ribu";
+    return "Rp " + fmt.format(Math.round(r));
+  }
+  function metricVal(mode, v) {   // {val, unit} siap tampil
+    if (mode.key === "prioritas") return { val: fmt3.format(v), unit: mode.unit };
+    if (mode.key === "ekonomi")  return { val: frp(v), unit: "" };
+    return { val: fval(v), unit: mode.unit };
+  }
   function isData(v, nd) { return v !== null && v !== undefined && isFinite(v) && v > 0 && v !== nd; }
 
   // ---------------- PETA ----------------
@@ -71,6 +95,12 @@
   L.control.zoom({ position: "bottomright" }).addTo(map);
   map.setView([-7.6, 112.8], 7);
   var renderer = L.canvas({ padding: 0.5 });
+  // lapisan TOC di atas grid: kawasan (poligon) lalu titik perusahaan
+  map.createPane("kawasanPane"); map.getPane("kawasanPane").style.zIndex = 620;
+  map.createPane("poiPane");     map.getPane("poiPane").style.zIndex = 640;
+  // SVG (bukan canvas): area kosong meneruskan klik ke sel grid di bawahnya; canvas akan menelannya
+  var kawasanRenderer = L.svg({ pane: "kawasanPane", padding: 0.5 });
+  var poiRenderer     = L.svg({ pane: "poiPane", padding: 0.5 });
   var bases = {
     osm: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors", maxZoom: 19 }),
     sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { attribution: "Tiles &copy; Esri", maxZoom: 19 })
@@ -87,6 +117,9 @@
   var GEO = null;                 // FeatureCollection kabupaten/kota
   var boundaryLayer = null;       // garis batas (selalu tampil)
   var featureLayers = {};         // fid -> leaflet layer (untuk zoom dari tabel)
+  var POI = {};                   // key sektor -> array titik {n,lat,lng,tk,k,a,st,sk}
+  var poiLayers = {};             // key -> L.layerGroup titik (dibuat saat pertama dinyalakan)
+  var kawasanLayers = {};         // key -> L.geoJSON poligon kawasan
 
   // ---------------- MUAT 1 GEOTIFF ----------------
   function loadTif(url) {
@@ -142,6 +175,7 @@
         cells.forEach(function (x, i) { x.rank = i + 1; });
 
         s.cells = cells;
+        s.gp = { pw: gp.pw, ph: gp.ph, x0: gp.x0, y0: gp.y0 };  // geotransform utk binning titik→sel
         s.maxE = mE; s.maxK = mK; s.maxT = mT;
         s.totEmisi = cells.reduce(function (a, x) { return a + x.emisi; }, 0);
         s.totEko = cells.reduce(function (a, x) { return a + x.eko; }, 0);
@@ -156,6 +190,22 @@
       .then(function (r) { if (!r.ok) throw new Error(r.status + " " + GEOJSON_URL); return r.json(); })
       .then(function (gj) { GEO = gj; return gj; })
       .catch(function (e) { console.warn("gagal muat geojson", e.message); GEO = null; return null; });
+  }
+
+  // ---------------- MUAT TITIK PERUSAHAAN ----------------
+  function loadPoi() {
+    return fetch(POI_URL)
+      .then(function (r) { if (!r.ok) throw new Error(r.status + " " + POI_URL); return r.json(); })
+      .then(function (j) { POI = j || {}; return j; })
+      .catch(function (e) { console.warn("gagal muat titik perusahaan", e.message); POI = {}; return null; });
+  }
+
+  // ---------------- MUAT 1 KAWASAN (poligon) ----------------
+  function loadKawasan(k) {
+    return fetch(k.file)
+      .then(function (r) { if (!r.ok) throw new Error(r.status + " " + k.file); return r.json(); })
+      .then(function (gj) { k.geo = gj; k.count = (gj.features || []).length; return gj; })
+      .catch(function (e) { console.warn("gagal muat", k.file, e.message); k.geo = null; k.count = 0; return null; });
   }
 
   function labelKab(p) { return (p.TYPE_2 === "Kota" ? "Kota " : "Kab. ") + p.NAME_2; }
@@ -217,10 +267,10 @@
     });
   }
 
-  Promise.all([Promise.all(SEKTOR.map(muat)), loadGeo()])
+  Promise.all([Promise.all(SEKTOR.map(muat)), loadGeo(), loadPoi(), Promise.all(KAWASAN.map(loadKawasan))])
     .then(function () {
       aggregate(); buildBoundary();
-      loader.classList.add("hidden"); buildLevels(); buildModes(); buildList(); select(activeKey);
+      loader.classList.add("hidden"); buildLevels(); buildModes(); buildList(); buildToc(); select(activeKey);
     })
     .catch(function (err) {
       loader.textContent = "Gagal memuat data. Jalankan lewat local server lalu muat ulang.";
@@ -257,7 +307,7 @@
     layer.clearLayers();
     var bounds = L.latLngBounds();
     var isPrio = mode.key === "prioritas";
-    var ramp = isPrio ? rampPrio : rampEmisi;
+    var ramp = rampForMode(mode);
 
     // batas warna
     var vals = s.cells.map(function (x) { return x[mode.field]; }).filter(function (v) { return v > 0; });
@@ -274,8 +324,9 @@
       });
       rect.on("mouseover", function () {
         this.setStyle({ weight: 2, color: "#33332b", fillOpacity: 0.95 }); this.bringToFront();
+        var mv = metricVal(mode, v);
         readout.innerHTML = '<div class="r-lab">' + s.nama + ' · peringkat #' + cell.rank + '</div>' +
-          '<div class="r-val">' + (isPrio ? fmt3.format(cell.score) : fval(v)) + ' <span class="r-unit">' + mode.unit + '</span></div>';
+          '<div class="r-val">' + mv.val + (mv.unit ? ' <span class="r-unit">' + mv.unit + '</span>' : '') + '</div>';
         readout.hidden = false;
       });
       rect.on("mouseout", function () { this.setStyle({ weight: 0.4, color: col, fillOpacity: v > 0 ? 0.80 : 0.12 }); readout.hidden = true; });
@@ -297,7 +348,7 @@
     layer.clearLayers();
     featureLayers = {};
     var isPrio = mode.key === "prioritas";
-    var ramp = isPrio ? rampPrio : rampEmisi;
+    var ramp = rampForMode(mode);
 
     var vals = s.kab.filter(function (k) { return k.ada && k[mode.field] > 0; })
                     .map(function (k) { return k[mode.field]; });
@@ -323,8 +374,9 @@
         featureLayers[f.properties.fid] = lyr;
         lyr.on("mouseover", function () {
           this.setStyle({ weight: 2.2, color: "#33332b", fillOpacity: 0.95 }); this.bringToFront();
+          var mv = metricVal(mode, k[mode.field]);
           readout.innerHTML = '<div class="r-lab">' + k.nama + (k.rank ? ' · peringkat #' + k.rank : '') + '</div>' +
-            '<div class="r-val">' + (isPrio ? fmt3.format(k.score) : fval(k[mode.field])) + ' <span class="r-unit">' + mode.unit + '</span></div>';
+            '<div class="r-val">' + mv.val + (mv.unit ? ' <span class="r-unit">' + mv.unit + '</span>' : '') + '</div>';
           readout.hidden = false;
         });
         lyr.on("mouseout", function () { gl.resetStyle(this); readout.hidden = true; });
@@ -348,23 +400,48 @@
       '<div class="popup-score">' + (k.rank ? 'Peringkat prioritas #' + k.rank + ' dari ' + s.kabNada + ' · skor ' + fmt3.format(k.score) : 'Tanpa data sektor ini') + '</div>' +
       '<table class="popup-tab">' +
         '<tr><td>Emisi S1+S2</td><td>' + fval(k.emisi) + ' t</td><td>' + fmt.format(k.ne * 100) + '%</td></tr>' +
-        '<tr><td>Ekonomi (NT)</td><td>' + fval(k.eko) + ' rb Rp</td><td>' + fmt.format(k.nk * 100) + '%</td></tr>' +
+        '<tr><td>Ekonomi (NT)</td><td>' + frp(k.eko) + '</td><td>' + fmt.format(k.nk * 100) + '%</td></tr>' +
         '<tr><td>Tenaga Kerja</td><td>' + fval(k.tk) + ' org</td><td>' + fmt.format(k.nt * 100) + '%</td></tr>' +
       '</table>' +
       '<div class="popup-coord">' + k.n + ' sel grid · ' + k.tipe + '</div>'
     ).openOn(map);
   }
 
+  // jumlah titik perusahaan sektor s pada sel (r,c) — binning piksel yang sama dgn raster, di-cache per sektor
+  function firmCount(s, cell) {
+    if (!s.firmByRC) {
+      s.firmByRC = {};
+      var gp = s.gp, arr = POI[s.key] || [];
+      if (gp) arr.forEach(function (p) {
+        var c = Math.floor((p.lng - gp.x0) / gp.pw);
+        var r = Math.floor((gp.y0 - p.lat) / gp.ph);
+        var k = r + "_" + c; s.firmByRC[k] = (s.firmByRC[k] || 0) + 1;
+      });
+    }
+    return s.firmByRC[cell.r + "_" + cell.c] || 0;
+  }
+
   function openCell(s, cell) {
+    var nf = firmCount(s, cell);
+    var avg = nf > 0
+      ? '<div class="popup-eyebrow" style="margin-top:11px">Rata-rata / perusahaan · ' + fnum(nf) + ' pabrik</div>' +
+        '<table class="popup-tab">' +
+          '<tr><td>Emisi Scope 1</td><td>' + fval(cell.s1 / nf) + ' t</td></tr>' +
+          '<tr><td>Emisi Scope 2</td><td>' + fval(cell.s2 / nf) + ' t</td></tr>' +
+          '<tr><td>Total emisi (S1+S2)</td><td>' + fval(cell.emisi / nf) + ' t</td></tr>' +
+          '<tr><td>Ekonomi (NT)</td><td>' + frp(cell.eko / nf) + '</td></tr>' +
+          '<tr><td>Tenaga Kerja</td><td>' + fnum(Math.round(cell.tk / nf)) + ' org</td></tr>' +
+        '</table>'
+      : '<div class="popup-coord" style="margin-top:9px">Tidak ada titik perusahaan sektor ini di sel.</div>';
     L.popup({ maxWidth: 260 }).setLatLng([cell.lat, cell.lng]).setContent(
       '<div class="popup-eyebrow">' + s.nama + ' · KBLI ' + s.kbli + '</div>' +
       '<div class="popup-rank">Peringkat prioritas #' + cell.rank + ' dari ' + s.cells.length + '</div>' +
       '<div class="popup-score">Skor ' + fmt3.format(cell.score) + '</div>' +
       '<table class="popup-tab">' +
-        '<tr><td>Emisi S1+S2</td><td>' + fval(cell.emisi) + ' t</td><td>' + fmt.format(cell.ne * 100) + '%</td></tr>' +
-        '<tr><td>Ekonomi (NT)</td><td>' + fval(cell.eko) + ' rb Rp</td><td>' + fmt.format(cell.nk * 100) + '%</td></tr>' +
-        '<tr><td>Tenaga Kerja</td><td>' + fval(cell.tk) + ' org</td><td>' + fmt.format(cell.nt * 100) + '%</td></tr>' +
-      '</table>' +
+        '<tr><td>Total emisi</td><td>' + fval(cell.emisi) + ' t</td><td>' + fmt.format(cell.ne * 100) + '%</td></tr>' +
+        '<tr><td>Total ekonomi</td><td>' + frp(cell.eko) + '</td><td>' + fmt.format(cell.nk * 100) + '%</td></tr>' +
+        '<tr><td>Total TK</td><td>' + fval(cell.tk) + ' org</td><td>' + fmt.format(cell.nt * 100) + '%</td></tr>' +
+      '</table>' + avg +
       '<div class="popup-coord">' + fmt1.format(cell.lat) + '°, ' + fmt1.format(cell.lng) + '°</div>'
     ).openOn(map);
   }
@@ -385,9 +462,11 @@
       document.getElementById("kpiTotalLabel").textContent = "Total " + mode.nama;
       document.getElementById("kpiAltLabel").textContent = "Sel Terisi";
       document.getElementById("kpiMaxLabel").textContent = "Sel Tertinggi";
-      elT.textContent = fval(tot);
+      var mvT = metricVal(mode, tot), mvM = metricVal(mode, mx);
+      document.getElementById("kpiUnit").textContent = mvT.unit;
+      elT.textContent = mvT.val;
       elC.textContent = fnum(s.cells.filter(function (x) { return x[mode.field] > 0; }).length);
-      elM.textContent = fval(mx);
+      elM.textContent = mvM.val;
     }
   }
 
@@ -408,9 +487,11 @@
       document.getElementById("kpiTotalLabel").textContent = "Total " + mode.nama;
       document.getElementById("kpiAltLabel").textContent = "Kab./Kota Berdata";
       document.getElementById("kpiMaxLabel").textContent = "Wilayah Tertinggi";
-      elT.textContent = fval(sum);
+      var mvT = metricVal(mode, sum), mvM = metricVal(mode, mx);
+      document.getElementById("kpiUnit").textContent = mvT.unit;
+      elT.textContent = mvT.val;
       elC.textContent = fnum(s.kabNada);
-      elM.textContent = fval(mx);
+      elM.textContent = mvM.val;
     }
   }
 
@@ -418,10 +499,9 @@
     document.getElementById("legendMode").textContent = mode.nama;
     if (mode.key === "prioritas") { document.getElementById("legMin").textContent = "0"; document.getElementById("legMax").textContent = "1"; }
     else { document.getElementById("legMin").textContent = fval(mn); document.getElementById("legMax").textContent = fval(mx); }
-    var ramp = mode.key === "prioritas" ? rampPrio : rampEmisi;
-    var stops = ramp.length;
+    var ramp = rampForMode(mode);
     var grad = [];
-    for (var i = 0; i <= 10; i++) grad.push((mode.key === "prioritas" ? rampPrio : rampEmisi)(i / 10) + " " + (i * 10) + "%");
+    for (var i = 0; i <= 10; i++) grad.push(ramp(i / 10) + " " + (i * 10) + "%");
     document.getElementById("legendBar").style.background = "linear-gradient(90deg," + grad.join(",") + ")";
   }
 
@@ -464,6 +544,102 @@
         openKab(s, k);
       });
       body.appendChild(tr);
+    });
+  }
+
+  // ---------------- TOC: TITIK PERUSAHAAN & KAWASAN ----------------
+  function tocItem(parent, opt) {
+    var lab = document.createElement("label");
+    lab.className = "toc-item";
+    lab.innerHTML =
+      '<input type="checkbox">' +
+      '<span class="' + (opt.swatch ? "toc-swatch" : "toc-dot") + '" style="background:' + opt.color + '"></span>' +
+      '<span class="toc-nama">' + opt.nama + '</span>' +
+      '<span class="toc-count">' + fnum(opt.count) + '</span>';
+    parent.appendChild(lab);
+    return lab.querySelector("input");
+  }
+
+  function poiPopup(s, p) {
+    var closed = p.st && /tutup|permanen|closed/i.test(p.st);
+    var h = '<div class="popup-eyebrow">' + s.nama + ' · KBLI ' + s.kbli + '</div>' +
+            '<div class="popup-rank">' + (p.n || "(tanpa nama)") + '</div>' +
+            '<div class="popup-score">' + (p.k || "–") + (p.tk != null ? ' · ' + fnum(p.tk) + ' tenaga kerja' : '') + '</div>';
+    if (p.a) h += '<div class="popup-coord">' + p.a + '</div>';
+    if (closed) h += '<div class="popup-warn">⚠ ' + p.st + '</div>';
+    else if (p.sk && /centroid/i.test(p.sk)) h += '<div class="popup-coord">Titik perkiraan (' + p.sk.replace("centroid_", "centroid ") + ')</div>';
+    return h;
+  }
+
+  function makePoiLayer(s) {
+    var grp = L.layerGroup(), arr = POI[s.key] || [];
+    arr.forEach(function (p) {
+      var besar = p.k === "Besar";
+      var m = L.circleMarker([p.lat, p.lng], {
+        pane: "poiPane", renderer: poiRenderer,
+        radius: besar ? 5 : 3.2, color: "#ffffff", weight: 1, opacity: 0.9,
+        fillColor: s.dot, fillOpacity: 0.92
+      });
+      m.bindPopup(poiPopup(s, p), { maxWidth: 260 });
+      grp.addLayer(m);
+    });
+    return grp;
+  }
+
+  function togglePoi(s, on) {
+    if (on) { if (!poiLayers[s.key]) poiLayers[s.key] = makePoiLayer(s); poiLayers[s.key].addTo(map); }
+    else if (poiLayers[s.key]) map.removeLayer(poiLayers[s.key]);
+  }
+
+  function kawasanPopup(k, pr) {
+    var rows = [];
+    function add(lab, val) { if (val !== undefined && val !== null && val !== "") rows.push('<tr><td>' + lab + '</td><td>' + val + '</td></tr>'); }
+    if (k.key === "kek") {
+      add("Jenis", pr.jeniskek); add("Lokasi", pr.lokasi);
+      add("Luas", pr.luas_ha != null ? fnum(pr.luas_ha) + " ha" : null);
+      add("Pengusul", pr.pengusul); add("Fokus", pr.kutkek);
+    } else {
+      add("Pengelola", pr.pengelola); add("Alamat", pr.alamat);
+      add("Luas", pr.luas != null ? fnum(pr.luas) + " ha" : null);
+      add("Fokus", pr.fokus_ind); add("Anchor", pr.anchor_ind);
+    }
+    return '<div class="popup-eyebrow">' + (k.key === "kek" ? "KEK" : "Kawasan Industri") + '</div>' +
+           '<div class="popup-rank">' + (pr.namobj || k.nama) + '</div>' +
+           '<table class="popup-tab">' + rows.join("") + '</table>';
+  }
+
+  function makeKawasanLayer(k) {
+    return L.geoJSON(k.geo, {
+      pane: "kawasanPane", renderer: kawasanRenderer,
+      style: { color: k.color, weight: 1.5, opacity: 0.9, fillColor: k.color, fillOpacity: 0.18 },
+      onEachFeature: function (f, lyr) {
+        lyr.bindPopup(kawasanPopup(k, f.properties || {}), { maxWidth: 290 });
+        lyr.on("mouseover", function () { this.setStyle({ fillOpacity: 0.34, weight: 2.2 }); });
+        lyr.on("mouseout", function () { this.setStyle({ fillOpacity: 0.18, weight: 1.5 }); });
+      }
+    });
+  }
+
+  function toggleKawasan(k, on) {
+    if (on) { if (!kawasanLayers[k.key]) kawasanLayers[k.key] = makeKawasanLayer(k); kawasanLayers[k.key].addTo(map); }
+    else if (kawasanLayers[k.key]) map.removeLayer(kawasanLayers[k.key]);
+  }
+
+  function buildToc() {
+    var pe = document.getElementById("poiList"); pe.innerHTML = "";
+    var total = 0;
+    SEKTOR.forEach(function (s) {
+      var n = (POI[s.key] || []).length; total += n;
+      var cb = tocItem(pe, { nama: s.nama, color: s.dot, count: n });
+      cb.addEventListener("change", function () { togglePoi(s, this.checked); });
+    });
+    document.getElementById("poiTotal").textContent = "· " + fnum(total) + " titik";
+
+    var ke = document.getElementById("kawasanList"); ke.innerHTML = "";
+    KAWASAN.forEach(function (k) {
+      var cb = tocItem(ke, { nama: k.nama, color: k.color, count: k.count, swatch: true });
+      if (!k.geo) { cb.disabled = true; cb.closest(".toc-item").style.opacity = 0.5; }
+      cb.addEventListener("change", function () { toggleKawasan(k, this.checked); });
     });
   }
 

@@ -21,15 +21,14 @@
       <header class="panel-head">
         <p class="eyebrow">WebGIS · Jawa Timur · 2025</p>
         <h1>Prioritas <span>Intervensi</span></h1>
-        <p class="lede">Peringkat prioritas intervensi industri per <strong>kabupaten/kota</strong> atau sel grid 11 km — gabungan emisi, kontribusi ekonomi, dan tenaga kerja.</p>
       </header>
 
       <section class="modes">
         <p class="section-title">Tingkat Analisis</p>
         <div id="levelList" class="mode-list"></div>
-        <p class="section-title" style="margin-top:16px">Mode Peta</p>
+        <p class="section-title" style="margin-top:14px">Mode Peta</p>
         <div id="modeList" class="mode-list"></div>
-        <p class="mode-formula" id="modeFormula">Skor = ⅓·emisi + ⅓·ekonomi + ⅓·tenaga kerja (tiap metrik dinormalkan ÷ maks sektor). Emisi = Scope 1 + Scope 2.</p>
+        <p class="mode-formula" id="modeFormula">Skor = ⅓ emisi + ⅓ ekonomi + ⅓ TK (dinormalkan ÷ maks sektor).</p>
       </section>
 
       <section class="stats">
@@ -55,6 +54,13 @@
         <ul id="sektorList" class="sektor-list"></ul>
       </section>
 
+      <section class="toc">
+        <p class="section-title">Titik Perusahaan <span class="muted" id="poiTotal"></span></p>
+        <div id="poiList" class="toc-list"></div>
+        <p class="section-title" style="margin-top:14px">Kawasan</p>
+        <div id="kawasanList" class="toc-list"></div>
+      </section>
+
       <section class="ranking">
         <p class="section-title"><span id="rankTitle">Peringkat Prioritas Grid</span> <span class="muted" id="rankSektor"></span></p>
         <div class="rank-table-wrap">
@@ -65,7 +71,7 @@
             <tbody id="rankBody"></tbody>
           </table>
         </div>
-        <p class="legend-note">Skor 0–1; makin tinggi makin diprioritaskan. Klik baris untuk zoom ke sel.</p>
+        <p class="legend-note">Klik baris → zoom ke lokasi.</p>
       </section>
 
       <section class="legend">
@@ -75,12 +81,10 @@
           <span id="legMin">…</span>
           <span id="legMax">…</span>
         </div>
-        <p class="legend-note">Warna dinormalkan per sektor. Nomor di sel = peringkat prioritas.</p>
       </section>
 
       <footer class="panel-foot">
-        <span>NEXUS · Prioritas Intervensi Industri Jawa Timur</span>
-        <span class="muted">Sumber: EDGAR + BPS IBS 2016, proyeksi PDRB 2025, laporan emiten 2025.</span>
+        <span class="muted">NEXUS · EDGAR · BPS IBS · PDRB 2025 · laporan emiten 2025</span>
       </footer>
     </aside>
 
